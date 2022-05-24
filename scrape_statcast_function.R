@@ -144,6 +144,7 @@ season_pbp <- function(year) {
     all_date <- all_date[-c(102:105)]
   } else (stop('outside date range'))
   
+  
   pbp <- scrape_statcast_savant_v2(start_date= p_date,
                                              end_date = p_date)
   
