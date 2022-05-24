@@ -71,7 +71,7 @@ scrape_statcast_savant_v2 <- function(start_date = Sys.Date() - 1, end_date = Sy
   
   url_vars <- paste0(vars$pairs, collapse = "&")
   url <- paste0("https://baseballsavant.mlb.com/statcast_search/csv?", url_vars)
-  message(url)
+  message(url) 
   
   # Do a try/catch to show errors that the user may encounter while downloading.
   tryCatch(
