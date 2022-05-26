@@ -1,3 +1,5 @@
+#READ IN NEEDED PACKAGES
+
 usePackage <- function(p) {
   if(!is.element(p, installed.packages()[,1]))
     install.packages(p, dep = TRUE)
@@ -16,11 +18,15 @@ install.packages("remotes")
 remotes::install_github("camdenk/mlbplotR")
 pacman::p_load_current_gh("BillPetti/baseballr")
 
-#chadwick_test <- head(chadwick_player_lu())
+#The CHadwick table is used as a key. It contains the different playerIDs that 
+#a player might have between fangraphs, savant, BR, etc.
 
 chadwick_player_lu_table <- subset(chadwick_player_lu(), !is.na(key_mlbam)) %>%
   dplyr::select(key_mlbam,key_fangraphs, name_last, name_first) %>%
   dplyr::mutate(hitter_name = paste(name_first, name_last))
+
+#I made CSV's of players' sprint speed, which I pulled in from Baseball SAVANT
+#in my next iteration I am going to automate this so it just scrapes it from the site.
 
 sprint.speed19 <- read.csv("~/Desktop/baseball/shiftr/sprint_speed (1).csv") %>%
   dplyr::select(player_id, sprint_speed) %>% 
@@ -36,11 +42,11 @@ sprint.speed21 <- read.csv("~/Desktop/baseball/shiftr/sprint_speed (3).csv") %>%
 
 sprint.speed <- rbind(sprint.speed19, sprint.speed20, sprint.speed21)
 
-#chadwick2 <- chadwick_player_lu_table %>%
-#  left_join(sprint.speed, by=c("key_mlbam" = "player_id"))
-
-#mlb_all <- rbind(mlb_all21_2, mlb_all20_2, mlb_all19_2)
-
+/*
+#season_pbp is a function in the scrape_statcast_function.R script of this repository
+#It stems from the Bill Petti's "baseballr" package. I slightly modified his scrape_statcast_savant() function
+#so that the daily pbp data would append. I had issues with his function because the output table would max
+#out at 40,000 rows.
 
 mlb_all <- rbind((season_pbp(2019) %>%
                     subset(type == "X" & (bb_type == "ground_ball" | bb_type == "line_drive") & hit_distance_sc < 224 & !is.na(hc_x) & !is.na(hc_y) & !is.na(if_fielding_alignment) & !is.na(launch_speed))),
@@ -65,33 +71,6 @@ bip_ <- bip %>% dplyr::mutate(dis_org = sqrt((location_x - 0)^2 + (location_y - 
                      hit_loc = ifelse((angle<0 & stand == "R") | (angle > 0 & stand == "L"), "pull", "oppo"),
                      shift = ifelse(if_fielding_alignment != "Standard", 1, 0),
                      hit = ifelse(woba_value > 0, 1, 0))
-
-#train <- sample(1:nrow(bip_), nrow(bip_)*.8)
-
-#test <- as.factor(bip_[-train,]$woba_value)
-
-#ntree <- 250
-
-#y.train <- as.factor(bip_[train,]$woba_value)
-#y.test <- as.factor(bip_[-train,]$woba_value)
-
-#train.error <- rep(0, ntree)
-#test.error <- rep(0, ntree)
-
-# for (i in 1:ntree){
-#   bip.rf2 <- randomForest(as.factor(woba_value) ~ shift + launch_speed + angle +
-#                            stand + launch_angle, data = bip_, subset = train, ntree = i, importance = TRUE)
-#   
-#   yhat.train <- predict(bip.rf2, newdata = bip_[train,]) 
-#   train.error[i] <- (table(y.train,yhat.train)[1,1] + table(y.train,yhat.train)[2,2] + table(y.train,yhat.train)[3,3] +
-#                        table(y.train,yhat.train)[4,4])/length(y.train)
-#   
-#   yhat.test <- predict(bip.rf2, newdata = bip_[-train, ]) 
-#   test.error[i] <- (table(y.test,yhat.test)[1,1] + table(y.test,yhat.test)[2,2] + table(y.test,yhat.test)[3,3] +
-#                       table(y.test,yhat.test)[4,4])/length(y.test)
-# }
-
-#plot(test.error)
 
 bip_fin <- bip_ %>% dplyr::select(woba_value,hit, shift, launch_speed, angle, stand, launch_angle
                            ,hitter_name, p_team, h_team, outs_when_up, on_3b, on_2b, on_1b,game_year,sprint_speed) %>%
@@ -207,14 +186,6 @@ babip_comp_sum_def <- babip_comp_test %>% dplyr::select(p_team,shift_real, hit, 
                 diff = pred.babip.no.shift - ex_babip) %>%
   dplyr::arrange(desc(diff)) 
 
-teams_colors_logos <- mlbplotR::load_mlb_teams() %>% 
-  dplyr::filter(!team_primary_abbr %in% c("AL", "NL", "MLB")) %>% 
-  dplyr::mutate(
-    a = rep(1:6, 5),
-    b = sort(rep(1:5, 6), decreasing = TRUE),
-    alpha = ifelse(grepl("A", team_primary_abbr), 1, 0.75), # Keep alpha == 1 for teams that have an "A"
-    color = ifelse(grepl("E", team_primary_abbr), "b/w", NA) # Set teams that have an "E" to black & white
-  )
 
 babip_comp_sum_def2 <- babip_comp_sum_def %>%
   left_join(teams_colors_logos, by = c("p_team" = "team_primary_abbr"))
@@ -244,29 +215,29 @@ babip_comp_sum_def2 %>% ggplot2::ggplot(aes(x=ex_babip, xend=pred.babip.no.shift
 
 #try different approach
 
-x <- bip_comp[,c(1,3:16)]
-y <- bip_comp[,2]
-
-control <- trainControl(method="repeatedcv", number = 10, repeats=3, search="random")
-seed <- 6876
-metric <- "Accuracy"
-set.seed(seed)
-mtry <- sqrt(ncol(x))
-tunegrid <- expand.grid(.mtry = mtry)
-rf_random <- train(as.factor(hit) ~ shift + launch_speed + angle +
-                      stand + launch_angle, data = bip_comp, method = "rf", metric=metric,
-                    tuneLength = 15, trControl = control)
-print(rf_random)
-
-control.grid <- trainControl(method="repeatedcv", number = 10, repeats=3, search="grid")
-tunegrid <- expand.grid(.mtry = c(1:15))
-rf_grid <- train(as.factor(hit) ~ shift + launch_speed + angle +
-                     stand + launch_angle + sprint_speed, data = bip_comp, method = "rf", metric=metric,
-                   tuneGrid = tunegrid, trControl = control.grid)
-print(rf_grid)
-
-
-table(y.test.babip, yhat.boost.df$pred)
+# x <- bip_comp[,c(1,3:16)]
+# y <- bip_comp[,2]
+# 
+# control <- trainControl(method="repeatedcv", number = 10, repeats=3, search="random")
+# seed <- 6876
+# metric <- "Accuracy"
+# set.seed(seed)
+# mtry <- sqrt(ncol(x))
+# tunegrid <- expand.grid(.mtry = mtry)
+# rf_random <- train(as.factor(hit) ~ shift + launch_speed + angle +
+#                       stand + launch_angle, data = bip_comp, method = "rf", metric=metric,
+#                     tuneLength = 15, trControl = control)
+# print(rf_random)
+# 
+# control.grid <- trainControl(method="repeatedcv", number = 10, repeats=3, search="grid")
+# tunegrid <- expand.grid(.mtry = c(1:15))
+# rf_grid <- train(as.factor(hit) ~ shift + launch_speed + angle +
+#                      stand + launch_angle + sprint_speed, data = bip_comp, method = "rf", metric=metric,
+#                    tuneGrid = tunegrid, trControl = control.grid)
+# print(rf_grid)
+# 
+# 
+# table(y.test.babip, yhat.boost.df$pred)
 
 
 
