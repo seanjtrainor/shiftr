@@ -122,6 +122,8 @@ scrape_statcast_savant_v2 <- function(start_date = Sys.Date() - 1, end_date = Sy
   return(payload)
 } 
 
+saveRDS(scrape_statcast_savant_v2, "data/scrape_statcast_savant_v2.rds")
+
 season_pbp <- function(year) {
   if (year == 2017) {
     p_date = "2017-04-02"
@@ -142,7 +144,29 @@ season_pbp <- function(year) {
     p_date = "2021-04-01"
     all_date <- seq(as.Date("2021-04-02"), as.Date("2021-10-03"), by = "days")
     all_date <- all_date[-c(102:105)]
-  } else (stop('outside date range'))
+  } else if (year == 2022){
+    p_date = "2022-04-07"
+    all_date <- seq(as.Date("2022-04-08"), (Sys.Date() - 1), by = "days")
+    all_date <- all_date[-c(102:104)]
+  }
+  else (stop('outside date range'))
+  
+  team_abb <- data.frame(home_team = c("Angels", "Orioles", "Red Sox", "White Sox","Guardians", "Tigers", "Royals", "Twins", "Yankees", "Athletics", "Mariners", "Rays", "Rangers", "Blue Jays", "Diamondbacks", "Braves", "Cubs", "Reds", "Rockies", "Marlins", "Astros", "Dodgers", "Brewers", "Nationals", "Mets", "Phillies", "Pirates", "Cardinals", "Padres", "Giants"),
+                             abb = c("LAA", "BAL", "BOS", "CWS", "CLE", "DET", "KC", "MIN", "NYY", "OAK", "SEA", "TB", "TEX", "TOR", "ARI", "ATL", "CHC", "CIN", "COL", "MIA", "HOU", "LAD", "MIL", "WSH", "NYM", "PHI", "PIT", "STL", "SD", "SF"),
+                             league =c("AL", "AL","AL","AL","AL","AL", "AL","AL","AL","AL","AL","AL","AL","AL","NL","NL","NL", "NL", "NL", "NL", "AL", "NL", "NL", "NL", "NL", "NL", "NL", "NL", "NL", "NL")
+  )
+                             
+                             
+  pf <- fg_park(year) %>%
+    dplyr::select(home_team, "1yr")
+  
+  pf[pf == "Cleveland" | pf == "Indians"] <- "Guardians"
+  
+  pf <- pf %>%  dplyr::left_join(team_abb, by = "home_team") %>%
+    dplyr::select(abb, "1yr", league) %>%
+    rename(home_team = abb, PF = "1yr")
+  
+  
   
 
   pbp <- scrape_statcast_savant_v2(start_date= p_date,
@@ -156,8 +180,21 @@ season_pbp <- function(year) {
     pbp <- rbind(pbp, daily_)
   }
   
-  return(pbp)
+  
+  pbp_fin <- pbp %>% left_join(pf, by = "home_team") %>%
+   dplyr::mutate(p_team = ifelse(inning_topbot == "Bot", away_team, home_team),
+                  h_team = ifelse(inning_topbot == "Bot", home_team, away_team)) %>%
+    dplyr::left_join((team_abb %>% dplyr::select(abb, league) %>% rename(p_team = abb, p_league = league)),
+                     by = "p_team") %>%
+    dplyr::left_join((team_abb %>% dplyr::select(abb, league) %>% rename(h_team = abb, h_league = league)),
+                     by = "h_team")
+  
+  
+  
+  return(pbp_fin)
 }
+
+saveRDS(season_pbp, "data/season_pbp.rds")
 
 
 
